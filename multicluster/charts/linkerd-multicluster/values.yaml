@@ -44,6 +44,9 @@ gateway:
   # -- User id under which the gateway shall be ran
   UID: 2103
 
+  # -- Group id under which the gateway shall be ran
+  GID: 2103
+
 # -- Control plane version
 linkerdVersion: linkerdVersionValue
 # -- Additional labels to add to all pods
@@ -75,7 +78,7 @@ namespaceMetadata:
     # -- Docker image name for the namespace-metadata instance
     name: extension-init
     # -- Docker image tag for the namespace-metadata instance
-    tag: v0.1.0
+    tag: v0.1.1
     # -- Pull policy for the namespace-metadata instance
     # @default -- imagePullPolicy
     pullPolicy: ""
@@ -104,3 +107,6 @@ enablePodAntiAffinity: false
 # -- Creates a Job that adds necessary metadata to the extension's namespace
 # during install; disable if lack of privileges require doing this manually
 createNamespaceMetadataJob: true
+
+# -- Specifies the number of old ReplicaSets to retain to allow rollback.
+revisionHistoryLimit: 10

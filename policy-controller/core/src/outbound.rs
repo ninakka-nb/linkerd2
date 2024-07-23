@@ -1,5 +1,6 @@
-use crate::http_route::{
-    GroupKindNamespaceName, HeaderModifierFilter, HostMatch, HttpRouteMatch, RequestRedirectFilter,
+use crate::routes::{
+    FailureInjectorFilter, GroupKindNamespaceName, GrpcRouteMatch, HeaderModifierFilter, HostMatch,
+    HttpRouteMatch, RequestRedirectFilter,
 };
 use ahash::AHashMap as HashMap;
 use anyhow::Result;
@@ -19,6 +20,8 @@ pub trait DiscoverOutboundPolicy<T> {
 
 pub type OutboundPolicyStream = Pin<Box<dyn Stream<Item = OutboundPolicy> + Send + Sync + 'static>>;
 
+pub type RouteSet<M> = HashMap<GroupKindNamespaceName, OutboundRoute<M>>;
+
 pub struct OutboundDiscoverTarget {
     pub service_name: String,
     pub service_namespace: String,
@@ -28,7 +31,8 @@ pub struct OutboundDiscoverTarget {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct OutboundPolicy {
-    pub http_routes: HashMap<GroupKindNamespaceName, HttpRoute>,
+    pub http_routes: RouteSet<HttpRouteMatch>,
+    pub grpc_routes: RouteSet<GrpcRouteMatch>,
     pub authority: String,
     pub name: String,
     pub namespace: String,
@@ -38,18 +42,18 @@ pub struct OutboundPolicy {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct HttpRoute {
+pub struct OutboundRoute<M> {
     pub hostnames: Vec<HostMatch>,
-    pub rules: Vec<HttpRouteRule>,
+    pub rules: Vec<OutboundRouteRule<M>>,
 
-    /// This is required for ordering returned `HttpRoute`s by their creation
-    /// timestamp.
+    /// This is required for ordering returned routes
+    /// by their creation timestamp.
     pub creation_timestamp: Option<DateTime<Utc>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct HttpRouteRule {
-    pub matches: Vec<HttpRouteMatch>,
+pub struct OutboundRouteRule<M> {
+    pub matches: Vec<M>,
     pub backends: Vec<Backend>,
     pub request_timeout: Option<time::Duration>,
     pub backend_request_timeout: Option<time::Duration>,
@@ -78,6 +82,7 @@ pub struct WeightedService {
     pub namespace: String,
     pub port: NonZeroU16,
     pub filters: Vec<Filter>,
+    pub exists: bool,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -97,4 +102,5 @@ pub enum Filter {
     RequestHeaderModifier(HeaderModifierFilter),
     ResponseHeaderModifier(HeaderModifierFilter),
     RequestRedirect(RequestRedirectFilter),
+    FailureInjector(FailureInjectorFilter),
 }

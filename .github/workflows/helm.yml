@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/helm.yml
       - bin/helm*
+      - "charts/**"
       - "**/charts/**"
 
 permissions:
@@ -16,6 +17,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: linkerd/dev/actions/setup-tools@v43
-      - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
       - run: helm-docs
       - run: git diff --exit-code -- **/charts/**/README.md

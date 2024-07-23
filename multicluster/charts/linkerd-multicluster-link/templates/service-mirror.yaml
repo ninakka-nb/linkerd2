@@ -98,6 +98,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: {{ .Values.replicas }}
+  revisionHistoryLimit: {{.Values.revisionHistoryLimit}}
   selector:
     matchLabels:
       component: linkerd-service-mirror
@@ -158,6 +159,7 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: {{.Values.serviceMirrorUID}}
+          runAsGroup: {{.Values.serviceMirrorGID}}
           seccompProfile:
             type: RuntimeDefault
         ports:

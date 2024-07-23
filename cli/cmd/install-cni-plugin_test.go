@@ -16,7 +16,7 @@ func TestRenderCNIPlugin(t *testing.T) {
 
 	image := cniPluginImage{
 		name:       "my-docker-registry.io/awesome/cni-plugin-test-image",
-		version:    "v1.3.0",
+		version:    "v1.4.0",
 		pullPolicy: nil,
 	}
 	fullyConfiguredOptions := &cniPluginOptions{
@@ -29,6 +29,7 @@ func TestRenderCNIPlugin(t *testing.T) {
 		ignoreInboundPorts:  make([]string, 0),
 		ignoreOutboundPorts: make([]string, 0),
 		proxyUID:            12102,
+		proxyGID:            12102,
 		image:               image,
 		logLevel:            "debug",
 		destCNINetDir:       "/etc/kubernetes/cni/net.d",
@@ -46,6 +47,7 @@ func TestRenderCNIPlugin(t *testing.T) {
 		ignoreInboundPorts:  make([]string, 0),
 		ignoreOutboundPorts: make([]string, 0),
 		proxyUID:            12102,
+		proxyGID:            12102,
 		image:               image,
 		logLevel:            "debug",
 		destCNINetDir:       "/etc/kubernetes/cni/net.d",
@@ -63,6 +65,7 @@ func TestRenderCNIPlugin(t *testing.T) {
 		ignoreInboundPorts:  make([]string, 0),
 		ignoreOutboundPorts: make([]string, 0),
 		proxyUID:            12102,
+		proxyGID:            12102,
 		image:               image,
 		logLevel:            "debug",
 		destCNINetDir:       "/etc/kubernetes/cni/net.d",

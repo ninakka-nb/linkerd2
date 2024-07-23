@@ -360,6 +360,7 @@ metadata:
   namespace: linkerd-viz
 spec:
   replicas: 1
+  revisionHistoryLimit: 10
   selector:
     matchLabels:
       linkerd.io/extension: viz
@@ -378,7 +379,7 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/os: linux
-
+      
       containers:
       - args:
         - -controller-namespace=linkerd
@@ -414,6 +415,7 @@ spec:
           runAsNonRoot: true
           readOnlyRootFilesystem: true
           runAsUser: 2103
+          runAsGroup: 2103
           seccompProfile:
             type: RuntimeDefault
       securityContext:
@@ -421,7 +423,7 @@ spec:
           type: RuntimeDefault
       serviceAccountName: metrics-api
 ---
-apiVersion: policy.linkerd.io/v1beta2
+apiVersion: policy.linkerd.io/v1beta3
 kind: Server
 metadata:
   namespace: linkerd-viz
@@ -490,7 +492,7 @@ spec:
   - cidr: "0.0.0.0/0"
   - cidr: "::/0"
 ---
-apiVersion: policy.linkerd.io/v1beta2
+apiVersion: policy.linkerd.io/v1beta3
 kind: Server
 metadata:
   namespace: linkerd-viz
@@ -573,6 +575,7 @@ metadata:
   namespace: linkerd-viz
 spec:
   replicas: 1
+  revisionHistoryLimit: 10
   selector:
     matchLabels:
       linkerd.io/extension: viz
@@ -593,7 +596,7 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/os: linux
-
+      
       containers:
       - args:
         - api
@@ -631,6 +634,7 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: 2103
+          runAsGroup: 2103
           seccompProfile:
             type: RuntimeDefault
         volumeMounts:
@@ -646,7 +650,7 @@ spec:
         secret:
           secretName: tap-k8s-tls
 ---
-apiVersion: policy.linkerd.io/v1beta2
+apiVersion: policy.linkerd.io/v1beta3
 kind: Server
 metadata:
   namespace: linkerd-viz
@@ -749,6 +753,7 @@ webhooks:
     apiGroups: [""]
     apiVersions: ["v1"]
     resources: ["pods"]
+    scope: "Namespaced"
   sideEffects: None
 ---
 ###
@@ -791,13 +796,14 @@ metadata:
   namespace: linkerd-viz
 spec:
   replicas: 1
+  revisionHistoryLimit: 10
   selector:
     matchLabels:
       component: tap-injector
   template:
     metadata:
       annotations:
-        checksum/config: d1929cba78b3be3d4f4ccdb0177d328b09d87f39ba90f30fbbbd471be561f18f
+        checksum/config: f46683697f33ac5449b952d1d037718887c4f98421d0f4133bb19e1c873a925d
         linkerd.io/created-by: linkerd/helm dev-undefined
         linkerd.io/inject: enabled
         config.alpha.linkerd.io/proxy-wait-before-exit-seconds: "0"
@@ -808,7 +814,7 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/os: linux
-
+      
       containers:
       - args:
         - injector
@@ -843,6 +849,7 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: 2103
+          runAsGroup: 2103
           seccompProfile:
             type: RuntimeDefault
         volumeMounts:
@@ -858,7 +865,7 @@ spec:
         secret:
           secretName: tap-injector-k8s-tls
 ---
-apiVersion: policy.linkerd.io/v1beta2
+apiVersion: policy.linkerd.io/v1beta3
 kind: Server
 metadata:
   namespace: linkerd-viz
@@ -926,7 +933,7 @@ metadata:
     namespace: linkerd-viz
   annotations:
     linkerd.io/created-by: linkerd/helm dev-undefined
-
+    
     linkerd.io/inject: enabled
 spec:
   type: ClusterIP
@@ -959,6 +966,7 @@ metadata:
   namespace: linkerd-viz
 spec:
   replicas: 1
+  revisionHistoryLimit: 10
   selector:
     matchLabels:
       linkerd.io/extension: viz
@@ -978,7 +986,7 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/os: linux
-
+      
       containers:
       - args:
         - -linkerd-metrics-api-addr=metrics-api.linkerd-viz.svc.cluster.local:8085
@@ -1015,6 +1023,7 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: 2103
+          runAsGroup: 2103
           seccompProfile:
             type: RuntimeDefault
       securityContext:

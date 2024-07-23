@@ -125,6 +125,12 @@ spec:
 {{ $_ := set $tree.Values.proxy "workloadKind" "deployment" -}}
 {{ $_ := set $tree.Values.proxy "component" "linkerd-destination" -}}
 {{ $_ := set $tree.Values.proxy "waitBeforeExitSeconds" 0 -}}
+{{- if not (empty .Values.destinationProxyResources) }}
+{{- $c := dig "cores" .Values.proxy.cores .Values.destinationProxyResources }}
+{{- $_ := set $tree.Values.proxy "cores" $c }}
+{{- $r := merge .Values.destinationProxyResources .Values.proxy.resources }}
+{{- $_ := set $tree.Values.proxy "resources" $r }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -141,6 +147,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: {{.Values.controllerReplicas}}
+  revisionHistoryLimit: {{.Values.revisionHistoryLimit}}
   selector:
     matchLabels:
       linkerd.io/control-plane-component: destination
@@ -175,10 +182,6 @@ spec:
       {{- $_ := set $tree "component" "destination" -}}
       {{- include "linkerd.affinity" $tree | nindent 6 }}
       containers:
-      {{- if not (empty .Values.destinationProxyResources) }}
-      {{- $r := merge .Values.destinationProxyResources .Values.proxy.resources }}
-      {{- $_ := set $tree.Values.proxy "resources" $r }}
-      {{- end }}
       {{- $_ := set $tree.Values.proxy "await" $tree.Values.proxy.await }}
       {{- $_ := set $tree.Values.proxy "loadTrustBundleFromConfigMap" true }}
       {{- $_ := set $tree.Values.proxy "podInboundPorts" "8086,8090,8443,9443,9990,9996,9997" }}
@@ -204,7 +207,11 @@ spec:
         - -cluster-domain={{.Values.clusterDomain}}
         - -identity-trust-domain={{.Values.identityTrustDomain | default .Values.clusterDomain}}
         - -default-opaque-ports={{.Values.proxy.opaquePorts}}
+        - -enable-ipv6={{not .Values.disableIPv6}}
         - -enable-pprof={{.Values.enablePprof | default false}}
+        {{- if (.Values.destinationController).meshedHttp2ClientProtobuf }}
+        - --meshed-http2-client-params={{ toJson .Values.destinationController.meshedHttp2ClientProtobuf }}
+        {{- end }}
         {{- range (.Values.destinationController).additionalArgs }}
         - {{ . }}
         {{- end }}
@@ -249,6 +256,9 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: {{.Values.controllerUID}}
+          {{- if ge (int .Values.controllerGID) 0 }}
+          runAsGroup: {{.Values.controllerGID}}
+          {{- end }}
           allowPrivilegeEscalation: false
           seccompProfile:
             type: RuntimeDefault
@@ -294,6 +304,9 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: {{.Values.controllerUID}}
+          {{- if ge (int .Values.controllerGID) 0 }}
+          runAsGroup: {{.Values.controllerGID}}
+          {{- end }}
           allowPrivilegeEscalation: false
           seccompProfile:
             type: RuntimeDefault
@@ -344,9 +357,8 @@ spec:
             path: /ready
             port: admin-http
           initialDelaySeconds: 10
-        {{- $res := .Values.policyController.resources | default .Values.destinationResources }}
-        {{- if $res }}
-        {{- include "partials.resources" $res | nindent 8 }}
+        {{- if .Values.policyController.resources }}
+        {{- include "partials.resources" .Values.policyController.resources | nindent 8 }}
         {{- end }}
         securityContext:
           capabilities:
@@ -355,6 +367,9 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: {{.Values.controllerUID}}
+          {{- if ge (int .Values.controllerGID) 0 }}
+          runAsGroup: {{.Values.controllerGID}}
+          {{- end }}
           allowPrivilegeEscalation: false
           seccompProfile:
             type: RuntimeDefault

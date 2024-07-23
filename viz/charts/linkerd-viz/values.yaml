@@ -15,6 +15,8 @@ commonLabels: {}
 # -- Trust domain used for identity
 # @default -- clusterDomain
 identityTrustDomain: ""
+# -- Specifies the number of old ReplicaSets to retain to allow rollback.
+revisionHistoryLimit: 10
 
 # -- Docker registry for all viz components
 defaultRegistry: cr.l5d.io/linkerd
@@ -26,6 +28,8 @@ defaultLogLevel: info
 defaultLogFormat: plain
 # -- UID for all the viz components
 defaultUID: 2103
+# -- GID for all the viz components
+defaultGID: 2103
 
 # -- Namespace of the Linkerd core control-plane install
 linkerdNamespace: linkerd
@@ -123,6 +127,9 @@ metricsAPI:
   # -- UID for the metrics-api resource
   UID:
 
+  # -- GID for the metrics-api resource
+  GID:
+
   # -- NodeSelector section, See the
   # [K8S documentation](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector) for more information
   nodeSelector: *default_node_selector
@@ -219,8 +226,11 @@ tap:
     # into the tap component
     # resources:
 
-  # -- UID for the dashboard resource
+  # -- UID for the tap component
   UID:
+
+  # -- GID for the tap component
+  GID:
 
   # -- tap service configuration
   service:
@@ -262,6 +272,8 @@ tapInjector:
     #   foo: bar
   # -- UID for the tapInjector resource
   UID:
+  # -- GID for the tapInjector resource
+  GID:
   failurePolicy: Ignore
   resources:
     cpu:
@@ -350,6 +362,9 @@ dashboard:
   # -- UID for the dashboard resource
   UID:
 
+  # -- GID for the dashboard resource
+  GID:
+
   # -- Restrict the Linkerd Dashboard's default privileges to disallow Tap and Check
   restrictPrivileges: false
 
@@ -392,7 +407,7 @@ namespaceMetadata:
     # -- Docker image name for the namespace-metadata instance
     name: extension-init
     # -- Docker image tag for the namespace-metadata instance
-    tag: v0.1.0
+    tag: v0.1.1
     # -- Pull policy for the namespace-metadata instance
     # @default -- defaultImagePullPolicy
     pullPolicy: ""
@@ -498,6 +513,18 @@ prometheus:
   #   relabel_configs:
   #   - action: labelmap
   #     regex: __meta_kubernetes_node_label_(.+)
+
+  # -- A metricRelabelConfigs section allows to drop high cardinality metrics.
+  # *NOTE:* Please use with caution. Some metrics are needed for linkerd-viz to
+  # function properly.
+  metricRelabelConfigs:
+  # This allows us to fine tune prometheus cardinality by dropping certain
+  # metrics as suggested here: https://itnext.io/optimizing-linkerd-metrics-in-prometheus-de607ec10f6b
+  #
+  # Ex:
+  # - action: keep
+  #   source_labels: [le]
+  #   regex: "(?i)(|10|50|100|500|1000|10000|30000|\\+Inf)"
 
   # -- A sidecarContainers section specifies a list of secondary containers to run
   # in the prometheus pod e.g. to export data to non-prometheus systems

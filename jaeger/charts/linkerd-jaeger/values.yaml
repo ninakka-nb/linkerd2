@@ -45,6 +45,12 @@ enablePSP: false
 # -- Default UID for all the jaeger components
 defaultUID: 2103
 
+# -- Default GID for all the jaeger components
+defaultGID: 2103
+
+# -- Specifies the number of old ReplicaSets to retain to allow rollback.
+revisionHistoryLimit: 10
+
 # -- Kubernetes DNS Domain name to use
 clusterDomain: cluster.local
 collector:
@@ -85,6 +91,9 @@ collector:
 
   # -- UID for the collector resource
   UID:
+
+  # -- GID for the collector resource
+  GID:
 
   # -- OpenTelemetry Collector config, See the
   # [Configuration docs](https://opentelemetry.io/docs/collector/configuration/)
@@ -215,6 +224,9 @@ jaeger:
   # -- UID for the jaeger resource
   UID:
 
+  # -- GID for the jaeger resource
+  GID:
+
 linkerdVersion: &linkerd_version linkerdVersionValue
 
 namespaceMetadata:
@@ -224,7 +236,7 @@ namespaceMetadata:
     # -- Docker image name for the namespace-metadata instance
     name: extension-init
     # -- Docker image tag for the namespace-metadata instance
-    tag: v0.1.0
+    tag: v0.1.1
     # -- Pull policy for the namespace-metadata instance
     # @default -- imagePullPolicy
     pullPolicy: ""
@@ -276,7 +288,7 @@ webhook:
   injectCaFromSecret: ""
 
   # -- collector service address for the proxies to send trace data.
-  # Points by default to the the linkerd-jaeger collector
+  # Points by default to the linkerd-jaeger collector
   collectorSvcAddr: collector.linkerd-jaeger:55678
   # -- service account associated with the collector instance
   collectorSvcAccount: collector
@@ -321,3 +333,6 @@ webhook:
 
   # -- UID for the webhook resource
   UID:
+
+  # -- GID for the webhook resource
+  GID:

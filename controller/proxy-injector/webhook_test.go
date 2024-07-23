@@ -25,7 +25,9 @@ var (
 func confNsEnabled() *inject.ResourceConfig {
 	return inject.
 		NewResourceConfig(values, inject.OriginWebhook, "linkerd").
-		WithNsAnnotations(map[string]string{pkgK8s.ProxyInjectAnnotation: pkgK8s.ProxyInjectEnabled})
+		WithNsAnnotations(map[string]string{
+			pkgK8s.ProxyInjectAnnotation: pkgK8s.ProxyInjectEnabled,
+		})
 }
 
 func confNsDisabled() *inject.ResourceConfig {
@@ -45,7 +47,9 @@ func confNsWithOpaquePorts() *inject.ResourceConfig {
 func confNsWithoutOpaquePorts() *inject.ResourceConfig {
 	return inject.
 		NewResourceConfig(values, inject.OriginWebhook, "linkerd").
-		WithNsAnnotations(map[string]string{pkgK8s.ProxyInjectAnnotation: pkgK8s.ProxyInjectEnabled})
+		WithNsAnnotations(map[string]string{
+			pkgK8s.ProxyInjectAnnotation: pkgK8s.ProxyInjectEnabled,
+		})
 }
 
 func confNsWithConfigAnnotations() *inject.ResourceConfig {
@@ -202,7 +206,7 @@ func TestGetPodPatch(t *testing.T) {
 
 		// The namespace has two config annotations: one valid and one invalid
 		// the pod patch should only contain the valid annotation.
-		conf.AppendNamespaceAnnotations()
+		inject.AppendNamespaceAnnotations(conf.GetOverrideAnnotations(), conf.GetNsAnnotations(), conf.GetWorkloadAnnotations())
 		patchJSON, err := conf.GetPodPatch(true)
 		if err != nil {
 			t.Fatalf("Unexpected PatchForAdmissionRequest error: %s", err)

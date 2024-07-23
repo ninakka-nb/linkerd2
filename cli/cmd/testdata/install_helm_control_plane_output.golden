@@ -177,6 +177,7 @@ webhooks:
     apiVersions: ["*"]
     resources:
     - httproutes
+    - grpcroutes
   sideEffects: None
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -219,6 +220,7 @@ rules:
       - gateway.networking.k8s.io
     resources:
       - httproutes
+      - grpcroutes
     verbs:
       - get
       - list
@@ -233,6 +235,7 @@ rules:
       - gateway.networking.k8s.io
     resources:
       - httproutes/status
+      - grpcroutes/status
     verbs:
       - patch
   - apiGroups:
@@ -471,6 +474,7 @@ webhooks:
     apiGroups: [""]
     apiVersions: ["v1"]
     resources: ["pods", "services"]
+    scope: "Namespaced"
   sideEffects: None
   timeoutSeconds: 10
 ---
@@ -500,6 +504,7 @@ data:
     controller:
       podDisruptionBudget:
         maxUnavailable: 1
+    controllerGID: -1
     controllerImage: cr.l5d.io/linkerd/controller
     controllerLogFormat: plain
     controllerLogLevel: info
@@ -514,17 +519,29 @@ data:
       rollingUpdate:
         maxSurge: 25%
         maxUnavailable: 25%
+    destinationController:
+      meshedHttp2ClientProtobuf:
+        keep_alive:
+          interval:
+            seconds: 10
+          timeout:
+            seconds: 3
+          while_idle: true
     destinationProxyResources: null
     destinationResources: null
     disableHeartBeat: false
+    disableIPv6: true
     enableEndpointSlices: true
     enableH2Upgrade: true
     enablePodAntiAffinity: false
     enablePodDisruptionBudget: false
+    heartbeat: null
     heartbeatResources: null
     heartbeatSchedule: 1 2 3 4 5
     highAvailability: false
     identity:
+      additionalEnv: null
+      experimentalEnv: null
       externalCA: false
       issuer:
         clockSkewAllowance: 20s
@@ -629,11 +646,18 @@ data:
       disableInboundProtocolDetectTimeout: false
       disableOutboundProtocolDetectTimeout: false
       enableExternalProfiles: false
+      enableShutdownEndpoint: false
       experimentalEnv: null
+      gid: -1
       image:
         name: cr.l5d.io/linkerd/proxy
         pullPolicy: ""
         version: test-proxy-version
+      inbound:
+        server:
+          http2:
+            keepAliveInterval: 10s
+            keepAliveTimeout: 3s
       inboundConnectTimeout: 100ms
       inboundDiscoveryCacheUnusedTimeout: 90s
       isGateway: false
@@ -642,9 +666,15 @@ data:
         initialDelaySeconds: 10
         timeoutSeconds: 1
       logFormat: plain
-      logLevel: warn,linkerd=info,trust_dns=error
+      logHTTPHeaders: "off"
+      logLevel: warn,linkerd=info,hickory=error
       nativeSidecar: false
       opaquePorts: 25,587,3306,4444,5432,6379,9300,11211
+      outbound:
+        server:
+          http2:
+            keepAliveInterval: 10s
+            keepAliveTimeout: 3s
       outboundConnectTimeout: 1000ms
       outboundDiscoveryCacheUnusedTimeout: 5s
       podInboundPorts: ""
@@ -690,16 +720,8 @@ data:
       logFormat: ""
       logLevel: ""
       privileged: false
-      resources:
-        cpu:
-          limit: 100m
-          request: 100m
-        ephemeral-storage:
-          limit: ""
-          request: ""
-        memory:
-          limit: 20Mi
-          request: 20Mi
+      resources: null
+      runAsGroup: 65534
       runAsRoot: false
       runAsUser: 65534
       saMountPath: null
@@ -709,8 +731,10 @@ data:
         name: linkerd-proxy-init-xtables-lock
         readOnly: false
     proxyInjector:
+      additionalEnv: null
       caBundle: test-proxy-injector-ca-bundle
       crtPEM: ""
+      experimentalEnv: null
       externalSecret: true
       injectCaFrom: ""
       injectCaFromSecret: ""
@@ -727,6 +751,8 @@ data:
           - cert-manager
     proxyInjectorProxyResources: null
     proxyInjectorResources: null
+    revisionHistoryLimit: 10
+    spValidator: null
     tap:
       caBundle: test-tap-ca-bundle
       externalSecret: true
@@ -738,6 +764,8 @@ data:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    linkerd.io/control-plane-ns: linkerd-dev
   annotations:
     linkerd.io/created-by: linkerd/helm linkerd-version
   name: ext-namespace-metadata-linkerd-config
@@ -835,6 +863,7 @@ metadata:
   namespace: linkerd-dev
 spec:
   replicas: 1
+  revisionHistoryLimit: 10
   selector:
     matchLabels:
       linkerd.io/control-plane-component: identity
@@ -925,8 +954,10 @@ spec:
               fieldPath: spec.nodeName
         - name: LINKERD2_PROXY_INBOUND_PORTS_REQUIRE_TLS
           value: "8080"
+        - name: LINKERD2_PROXY_SHUTDOWN_ENDPOINT_ENABLED
+          value: "false"
         - name: LINKERD2_PROXY_LOG
-          value: "warn,linkerd=info,trust_dns=error"
+          value: "warn,linkerd=info,hickory=error,linkerd_proxy_http::client[{headers}]=off"
         - name: LINKERD2_PROXY_LOG_FORMAT
           value: "plain"
         - name: LINKERD2_PROXY_DESTINATION_SVC_ADDR
@@ -957,13 +988,15 @@ spec:
         - name: LINKERD2_PROXY_INBOUND_DISCOVERY_IDLE_TIMEOUT
           value: "90s"
         - name: LINKERD2_PROXY_CONTROL_LISTEN_ADDR
-          value: 0.0.0.0:4190
+          value: "[::]:4190"
         - name: LINKERD2_PROXY_ADMIN_LISTEN_ADDR
-          value: 0.0.0.0:4191
+          value: "[::]:4191"
         - name: LINKERD2_PROXY_OUTBOUND_LISTEN_ADDR
-          value: 127.0.0.1:4140
+          value: "127.0.0.1:4140"
+        - name: LINKERD2_PROXY_OUTBOUND_LISTEN_ADDRS
+          value: "127.0.0.1:4140"
         - name: LINKERD2_PROXY_INBOUND_LISTEN_ADDR
-          value: 0.0.0.0:4143
+          value: "[::]:4143"
         - name: LINKERD2_PROXY_INBOUND_IPS
           valueFrom:
             fieldRef:
@@ -976,6 +1009,14 @@ spec:
           value: 10000ms
         - name: LINKERD2_PROXY_OUTBOUND_CONNECT_KEEPALIVE
           value: 10000ms
+        - name: LINKERD2_PROXY_INBOUND_SERVER_HTTP2_KEEP_ALIVE_INTERVAL
+          value: "10s"
+        - name: LINKERD2_PROXY_INBOUND_SERVER_HTTP2_KEEP_ALIVE_TIMEOUT
+          value: "3s"
+        - name: LINKERD2_PROXY_OUTBOUND_SERVER_HTTP2_KEEP_ALIVE_INTERVAL
+          value: "10s"
+        - name: LINKERD2_PROXY_OUTBOUND_SERVER_HTTP2_KEEP_ALIVE_TIMEOUT
+          value: "3s"
         - name: LINKERD2_PROXY_INBOUND_PORTS_DISABLE_PROTOCOL_DETECTION
           value: "25,587,3306,4444,5432,6379,9300,11211"
         - name: LINKERD2_PROXY_DESTINATION_CONTEXT
@@ -1047,6 +1088,7 @@ spec:
           name: linkerd-identity-token
       initContainers:
       - args:
+        - --ipv6=false
         - --incoming-proxy-port
         - "4143"
         - --outgoing-proxy-port
@@ -1061,12 +1103,6 @@ spec:
         imagePullPolicy: IfNotPresent
         name: linkerd-init
         resources:
-          limits:
-            cpu: "100m"
-            memory: "20Mi"
-          requests:
-            cpu: "100m"
-            memory: "20Mi"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -1076,6 +1112,7 @@ spec:
           privileged: false
           runAsNonRoot: true
           runAsUser: 65534
+          runAsGroup: 65534
           readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
@@ -1207,6 +1244,7 @@ spec:
     port: 443
     targetPort: policy-https
 ---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -1222,6 +1260,7 @@ metadata:
   namespace: linkerd-dev
 spec:
   replicas: 1
+  revisionHistoryLimit: 10
   selector:
     matchLabels:
       linkerd.io/control-plane-component: destination
@@ -1234,7 +1273,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: bdf627c4f8fc3bc85e69064de22d6032ab30887fa55d18238a677e9b9b594dd8
+        checksum/config: aae2f97af199e93464b02da923a0732b603488c822241c14b2d86ba2bf6da03d
         linkerd.io/created-by: linkerd/helm linkerd-version
         linkerd.io/proxy-version: test-proxy-version
         cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
@@ -1263,8 +1302,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: LINKERD2_PROXY_SHUTDOWN_ENDPOINT_ENABLED
+          value: "false"
         - name: LINKERD2_PROXY_LOG
-          value: "warn,linkerd=info,trust_dns=error"
+          value: "warn,linkerd=info,hickory=error,linkerd_proxy_http::client[{headers}]=off"
         - name: LINKERD2_PROXY_LOG_FORMAT
           value: "plain"
         - name: LINKERD2_PROXY_DESTINATION_SVC_ADDR
@@ -1295,13 +1336,15 @@ spec:
         - name: LINKERD2_PROXY_INBOUND_DISCOVERY_IDLE_TIMEOUT
           value: "90s"
         - name: LINKERD2_PROXY_CONTROL_LISTEN_ADDR
-          value: 0.0.0.0:4190
+          value: "[::]:4190"
         - name: LINKERD2_PROXY_ADMIN_LISTEN_ADDR
-          value: 0.0.0.0:4191
+          value: "[::]:4191"
         - name: LINKERD2_PROXY_OUTBOUND_LISTEN_ADDR
-          value: 127.0.0.1:4140
+          value: "127.0.0.1:4140"
+        - name: LINKERD2_PROXY_OUTBOUND_LISTEN_ADDRS
+          value: "127.0.0.1:4140"
         - name: LINKERD2_PROXY_INBOUND_LISTEN_ADDR
-          value: 0.0.0.0:4143
+          value: "[::]:4143"
         - name: LINKERD2_PROXY_INBOUND_IPS
           valueFrom:
             fieldRef:
@@ -1314,6 +1357,14 @@ spec:
           value: 10000ms
         - name: LINKERD2_PROXY_OUTBOUND_CONNECT_KEEPALIVE
           value: 10000ms
+        - name: LINKERD2_PROXY_INBOUND_SERVER_HTTP2_KEEP_ALIVE_INTERVAL
+          value: "10s"
+        - name: LINKERD2_PROXY_INBOUND_SERVER_HTTP2_KEEP_ALIVE_TIMEOUT
+          value: "3s"
+        - name: LINKERD2_PROXY_OUTBOUND_SERVER_HTTP2_KEEP_ALIVE_INTERVAL
+          value: "10s"
+        - name: LINKERD2_PROXY_OUTBOUND_SERVER_HTTP2_KEEP_ALIVE_TIMEOUT
+          value: "3s"
         - name: LINKERD2_PROXY_INBOUND_PORTS_DISABLE_PROTOCOL_DETECTION
           value: "25,587,3306,4444,5432,6379,9300,11211"
         - name: LINKERD2_PROXY_DESTINATION_CONTEXT
@@ -1401,7 +1452,9 @@ spec:
         - -cluster-domain=cluster.local
         - -identity-trust-domain=test.trust.domain
         - -default-opaque-ports=25,587,3306,4444,5432,6379,9300,11211
+        - -enable-ipv6=false
         - -enable-pprof=false
+        - --meshed-http2-client-params={"keep_alive":{"interval":{"seconds":10},"timeout":{"seconds":3},"while_idle":true}}
         image: cr.l5d.io/linkerd/controller:linkerd-version
         imagePullPolicy: IfNotPresent
         livenessProbe:
@@ -1519,6 +1572,7 @@ spec:
           readOnly: true
       initContainers:
       - args:
+        - --ipv6=false
         - --incoming-proxy-port
         - "4143"
         - --outgoing-proxy-port
@@ -1533,12 +1587,6 @@ spec:
         imagePullPolicy: IfNotPresent
         name: linkerd-init
         resources:
-          limits:
-            cpu: "100m"
-            memory: "20Mi"
-          requests:
-            cpu: "100m"
-            memory: "20Mi"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -1548,6 +1596,7 @@ spec:
           privileged: false
           runAsNonRoot: true
           runAsUser: 65534
+          runAsGroup: 65534
           readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
@@ -1647,6 +1696,7 @@ spec:
 ###
 ### Proxy Injector
 ###
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -1662,6 +1712,7 @@ metadata:
   namespace: linkerd-dev
 spec:
   replicas: 1
+  revisionHistoryLimit: 10
   selector:
     matchLabels:
       linkerd.io/control-plane-component: proxy-injector
@@ -1672,7 +1723,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: 4e8be2f1320f4464106dcdc3271e16a97ab39937a873fc241ae65e0f16a4a751
+        checksum/config: a03c5a5d4ed8cae24c45d89569246c3e44eded6915cbdc71698e8008d3587d59
         linkerd.io/created-by: linkerd/helm linkerd-version
         linkerd.io/proxy-version: test-proxy-version
         cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
@@ -1702,8 +1753,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: LINKERD2_PROXY_SHUTDOWN_ENDPOINT_ENABLED
+          value: "false"
         - name: LINKERD2_PROXY_LOG
-          value: "warn,linkerd=info,trust_dns=error"
+          value: "warn,linkerd=info,hickory=error,linkerd_proxy_http::client[{headers}]=off"
         - name: LINKERD2_PROXY_LOG_FORMAT
           value: "plain"
         - name: LINKERD2_PROXY_DESTINATION_SVC_ADDR
@@ -1734,13 +1787,15 @@ spec:
         - name: LINKERD2_PROXY_INBOUND_DISCOVERY_IDLE_TIMEOUT
           value: "90s"
         - name: LINKERD2_PROXY_CONTROL_LISTEN_ADDR
-          value: 0.0.0.0:4190
+          value: "[::]:4190"
         - name: LINKERD2_PROXY_ADMIN_LISTEN_ADDR
-          value: 0.0.0.0:4191
+          value: "[::]:4191"
         - name: LINKERD2_PROXY_OUTBOUND_LISTEN_ADDR
-          value: 127.0.0.1:4140
+          value: "127.0.0.1:4140"
+        - name: LINKERD2_PROXY_OUTBOUND_LISTEN_ADDRS
+          value: "127.0.0.1:4140"
         - name: LINKERD2_PROXY_INBOUND_LISTEN_ADDR
-          value: 0.0.0.0:4143
+          value: "[::]:4143"
         - name: LINKERD2_PROXY_INBOUND_IPS
           valueFrom:
             fieldRef:
@@ -1753,6 +1808,14 @@ spec:
           value: 10000ms
         - name: LINKERD2_PROXY_OUTBOUND_CONNECT_KEEPALIVE
           value: 10000ms
+        - name: LINKERD2_PROXY_INBOUND_SERVER_HTTP2_KEEP_ALIVE_INTERVAL
+          value: "10s"
+        - name: LINKERD2_PROXY_INBOUND_SERVER_HTTP2_KEEP_ALIVE_TIMEOUT
+          value: "3s"
+        - name: LINKERD2_PROXY_OUTBOUND_SERVER_HTTP2_KEEP_ALIVE_INTERVAL
+          value: "10s"
+        - name: LINKERD2_PROXY_OUTBOUND_SERVER_HTTP2_KEEP_ALIVE_TIMEOUT
+          value: "3s"
         - name: LINKERD2_PROXY_INBOUND_PORTS_DISABLE_PROTOCOL_DETECTION
           value: "25,587,3306,4444,5432,6379,9300,11211"
         - name: LINKERD2_PROXY_DESTINATION_CONTEXT
@@ -1873,6 +1936,7 @@ spec:
           readOnly: true
       initContainers:
       - args:
+        - --ipv6=false
         - --incoming-proxy-port
         - "4143"
         - --outgoing-proxy-port
@@ -1887,12 +1951,6 @@ spec:
         imagePullPolicy: IfNotPresent
         name: linkerd-init
         resources:
-          limits:
-            cpu: "100m"
-            memory: "20Mi"
-          requests:
-            cpu: "100m"
-            memory: "20Mi"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -1902,6 +1960,7 @@ spec:
           privileged: false
           runAsNonRoot: true
           runAsUser: 65534
+          runAsGroup: 65534
           readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault

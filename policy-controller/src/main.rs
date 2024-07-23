@@ -12,6 +12,7 @@ use linkerd_policy_controller::{
     grpc, inbound, index_list::IndexList, k8s, outbound, Admission, ClusterInfo, DefaultPolicy,
     InboundDiscover, IpNet, OutboundDiscover,
 };
+use linkerd_policy_controller_k8s_api::gateway as k8s_gateway_api;
 use linkerd_policy_controller_k8s_index::ports::parse_portset;
 use linkerd_policy_controller_k8s_status::{self as status};
 use prometheus_client::registry::Registry;
@@ -93,6 +94,9 @@ struct Args {
 
     #[clap(long)]
     default_opaque_ports: String,
+
+    #[clap(long, default_value = "5000")]
+    patch_timeout_ms: u64,
 }
 
 #[tokio::main]
@@ -113,6 +117,7 @@ async fn main() -> Result<()> {
         control_plane_namespace,
         probe_networks,
         default_opaque_ports,
+        patch_timeout_ms,
     } = Args::parse();
 
     let server = if admission_controller_disabled {
@@ -120,14 +125,6 @@ async fn main() -> Result<()> {
     } else {
         Some(server)
     };
-
-    let mut runtime = kubert::Runtime::builder()
-        .with_log(log_level, log_format)
-        .with_admin(admin.into_builder().with_prometheus(<Registry>::default()))
-        .with_client(client)
-        .with_optional_server(server)
-        .build()
-        .await?;
 
     let probe_networks = probe_networks.map(|IpNets(nets)| nets).unwrap_or_default();
 
@@ -142,6 +139,33 @@ async fn main() -> Result<()> {
         default_opaque_ports,
         probe_networks,
     });
+
+    // Build the API index data structures which will maintain information
+    // necessary for serving the inbound policy and outbound policy gRPC APIs.
+    let inbound_index = inbound::Index::shared(cluster_info.clone());
+    let outbound_index = outbound::Index::shared(cluster_info);
+
+    let mut prom = <Registry>::default();
+    let resource_status = prom.sub_registry_with_prefix("resource_status");
+    let status_metrics = status::ControllerMetrics::register(resource_status);
+    let status_index_metrcs = status::IndexMetrics::register(resource_status);
+
+    outbound::metrics::register(
+        prom.sub_registry_with_prefix("outbound_index"),
+        outbound_index.clone(),
+    );
+    inbound::metrics::register(
+        prom.sub_registry_with_prefix("inbound_index"),
+        inbound_index.clone(),
+    );
+
+    let mut runtime = kubert::Runtime::builder()
+        .with_log(log_level, log_format)
+        .with_admin(admin.into_builder().with_prometheus(prom))
+        .with_client(client)
+        .with_optional_server(server)
+        .build()
+        .await?;
 
     let hostname =
         std::env::var("HOSTNAME").expect("Failed to fetch `HOSTNAME` environment variable");
@@ -158,15 +182,15 @@ async fn main() -> Result<()> {
     .await?;
     let (claims, _task) = lease.spawn(hostname.clone(), params).await?;
 
-    // Build the API index data structures which will maintain information
-    // necessary for serving the inbound policy and outbound policy gRPC APIs.
-    let inbound_index = inbound::Index::shared(cluster_info.clone());
-    let outbound_index = outbound::Index::shared(cluster_info);
-
     // Build the status index which will maintain information necessary for
     // updating the status field of policy resources.
     let (updates_tx, updates_rx) = mpsc::channel(STATUS_UPDATE_QUEUE_SIZE);
-    let status_index = status::Index::shared(hostname.clone(), claims.clone(), updates_tx);
+    let status_index = status::Index::shared(
+        hostname.clone(),
+        claims.clone(),
+        updates_tx,
+        status_index_metrcs,
+    );
 
     // Spawn resource watches.
 
@@ -236,6 +260,17 @@ async fn main() -> Result<()> {
             .instrument(info_span!("httproutes.gateway.networking.k8s.io")),
     );
 
+    let gateway_grpc_routes =
+        runtime.watch_all::<k8s_gateway_api::GrpcRoute>(watcher::Config::default());
+    let gateway_grpc_routes_indexes = IndexList::new(outbound_index.clone())
+        .push(inbound_index.clone())
+        .push(status_index.clone())
+        .shared();
+    tokio::spawn(
+        kubert::index::namespaced(gateway_grpc_routes_indexes.clone(), gateway_grpc_routes)
+            .instrument(info_span!("grpcroutes.gateway.networking.k8s.io")),
+    );
+
     let services = runtime.watch_all::<k8s::Service>(watcher::Config::default());
     let services_indexes = IndexList::new(outbound_index.clone())
         .push(status_index.clone())
@@ -261,7 +296,14 @@ async fn main() -> Result<()> {
     ));
 
     let client = runtime.client();
-    let status_controller = status::Controller::new(claims, client, hostname, updates_rx);
+    let status_controller = status::Controller::new(
+        claims,
+        client,
+        hostname,
+        updates_rx,
+        Duration::from_millis(patch_timeout_ms),
+        status_metrics,
+    );
     tokio::spawn(
         status_controller
             .run()

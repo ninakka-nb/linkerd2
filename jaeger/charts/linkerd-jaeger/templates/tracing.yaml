@@ -69,6 +69,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: {{ .Values.collector.replicas }}
+  revisionHistoryLimit: {{.Values.revisionHistoryLimit}}
   selector:
     matchLabels:
       component: collector
@@ -154,6 +155,7 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: {{.Values.collector.UID | default .Values.defaultUID}}
+          runAsGroup: {{.Values.collector.GID | default .Values.defaultGID}}
           seccompProfile:
             type: RuntimeDefault
         volumeMounts:
@@ -211,6 +213,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
+  revisionHistoryLimit: {{.Values.revisionHistoryLimit}}
   selector:
     matchLabels:
       component: jaeger
@@ -270,6 +273,7 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: {{.Values.jaeger.UID | default .Values.defaultUID}}
+          runAsGroup: {{.Values.jaeger.GID | default .Values.defaultGID}}
           seccompProfile:
             type: RuntimeDefault
       dnsPolicy: ClusterFirst

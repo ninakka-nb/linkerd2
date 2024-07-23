@@ -1,9 +1,10 @@
 use super::*;
-use crate::http_route::gkn_for_linkerd_http_route;
+use crate::routes::ExplicitGKN;
 use linkerd_policy_controller_core::{
-    http_route::{HttpRouteMatch, Method, PathMatch},
+    routes::{HttpRouteMatch, Method, PathMatch},
     POLICY_CONTROLLER_NAME,
 };
+use linkerd_policy_controller_k8s_api::policy;
 
 const POLICY_API_GROUP: &str = "policy.linkerd.io";
 
@@ -39,7 +40,8 @@ fn route_attaches_to_server() {
             reference: ServerRef::Server("srv-8080".to_string()),
             authorizations: Default::default(),
             protocol: ProxyProtocol::Http1,
-            http_routes: mk_default_routes(),
+            http_routes: mk_default_http_routes(),
+            grpc_routes: mk_default_grpc_routes(),
         },
     );
 
@@ -55,9 +57,7 @@ fn route_attaches_to_server() {
     assert!(rx
         .borrow_and_update()
         .http_routes
-        .contains_key(&HttpRouteRef::Linkerd(gkn_for_linkerd_http_route(
-            "route-foo".to_string()
-        ))));
+        .contains_key(&RouteRef::Resource("route-foo".gkn::<policy::HttpRoute>())));
 
     // Create authz policy.
     test.index.write().apply(mk_authorization_policy(
@@ -73,12 +73,13 @@ fn route_attaches_to_server() {
     ));
 
     assert!(rx.has_changed().unwrap());
-    assert!(rx.borrow().http_routes
-        [&HttpRouteRef::Linkerd(gkn_for_linkerd_http_route("route-foo".to_string()))]
-        .authorizations
-        .contains_key(&AuthorizationRef::AuthorizationPolicy(
-            "authz-foo".to_string()
-        )));
+    assert!(
+        rx.borrow().http_routes[&RouteRef::Resource("route-foo".gkn::<policy::HttpRoute>())]
+            .authorizations
+            .contains_key(&AuthorizationRef::AuthorizationPolicy(
+                "authz-foo".to_string()
+            ))
+    );
 }
 
 #[test]
@@ -145,10 +146,7 @@ fn routes_created_for_probes() {
     // No Server is configured for the port, so expect the probe paths to be
     // authorized.
     let update = rx.borrow_and_update();
-    let probes = update
-        .http_routes
-        .get(&HttpRouteRef::Default("probe"))
-        .unwrap();
+    let probes = update.http_routes.get(&RouteRef::Default("probe")).unwrap();
     let probes_rules = probes.rules.first().unwrap();
     assert!(
         probes_rules.matches.contains(&liveness_match),
@@ -177,10 +175,7 @@ fn routes_created_for_probes() {
     // // No routes are configured for the Server, so we should still expect the
     // // Pod's probe paths to be authorized.
     let update = rx.borrow_and_update();
-    let probes = update
-        .http_routes
-        .get(&HttpRouteRef::Default("probe"))
-        .unwrap();
+    let probes = update.http_routes.get(&RouteRef::Default("probe")).unwrap();
     let probes_rules = probes.rules.first().unwrap();
     assert!(
         probes_rules.matches.contains(&liveness_match),
@@ -206,7 +201,7 @@ fn routes_created_for_probes() {
     assert!(!rx
         .borrow_and_update()
         .http_routes
-        .contains_key(&HttpRouteRef::Default("probes")));
+        .contains_key(&RouteRef::Default("probes")));
 }
 
 fn mk_route(

@@ -18,6 +18,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: {{.Values.gateway.replicas}}
+  revisionHistoryLimit: {{.Values.revisionHistoryLimit}}
   selector:
     matchLabels:
       app: {{.Values.gateway.name}}
@@ -58,6 +59,7 @@ spec:
             readOnlyRootFilesystem: true
             runAsNonRoot: true
             runAsUser: {{.Values.gateway.UID}}
+            runAsGroup: {{.Values.gateway.GID}}
             seccompProfile:
               type: RuntimeDefault
       securityContext:

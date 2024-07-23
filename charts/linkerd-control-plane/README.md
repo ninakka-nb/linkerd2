@@ -148,6 +148,7 @@ Kubernetes: `>=1.22.0-0`
 | controlPlaneTracingNamespace | string | `"linkerd-jaeger"` | namespace to send control plane traces to |
 | controller.podDisruptionBudget | object | `{"maxUnavailable":1}` | sets pod disruption budget parameter for all deployments |
 | controller.podDisruptionBudget.maxUnavailable | int | `1` | Maximum number of pods that can be unavailable during disruption |
+| controllerGID | int | `-1` | Optional customisation of the group ID for the control plane components (the group ID will be omitted if lower than 0) |
 | controllerImage | string | `"cr.l5d.io/linkerd/controller"` | Docker image for the destination and identity components |
 | controllerImageVersion | string | `""` | Optionally allow a specific container image Tag (or SHA) to be specified for the controllerImage. |
 | controllerLogFormat | string | `"plain"` | Log format for the control plane components |
@@ -158,7 +159,11 @@ Kubernetes: `>=1.22.0-0`
 | debugContainer.image.pullPolicy | string | imagePullPolicy | Pull policy for the debug container image |
 | debugContainer.image.version | string | linkerdVersion | Tag for the debug container image |
 | deploymentStrategy | object | `{"rollingUpdate":{"maxSurge":"25%","maxUnavailable":"25%"}}` | default kubernetes deployment strategy |
+| destinationController.meshedHttp2ClientProtobuf.keep_alive.interval.seconds | int | `10` |  |
+| destinationController.meshedHttp2ClientProtobuf.keep_alive.timeout.seconds | int | `3` |  |
+| destinationController.meshedHttp2ClientProtobuf.keep_alive.while_idle | bool | `true` |  |
 | disableHeartBeat | bool | `false` | Set to true to not start the heartbeat cronjob |
+| disableIPv6 | bool | `true` | disables routing IPv6 traffic in addition to IPv4 traffic through the proxy (IPv6 routing only available as of proxy-init v2.3.0 and linkerd-cni v1.4.0) |
 | enableEndpointSlices | bool | `true` | enables the use of EndpointSlice informers for the destination service; enableEndpointSlices should be set to true only if EndpointSlice K8s feature gate is on |
 | enableH2Upgrade | bool | `true` | Allow proxies to perform transparent HTTP/2 upgrading |
 | enablePSP | bool | `false` | Add a PSP resource and bind it to the control plane ServiceAccounts. Note PSP has been deprecated since k8s v1.21 |
@@ -182,7 +187,7 @@ Kubernetes: `>=1.22.0-0`
 | kubeAPI.clientBurst | int | `200` | Burst value over clientQPS |
 | kubeAPI.clientQPS | int | `100` | Maximum QPS sent to the kube-apiserver before throttling. See [token bucket rate limiter implementation](https://github.com/kubernetes/client-go/blob/v12.0.0/util/flowcontrol/throttle.go) |
 | linkerdVersion | string | `"linkerdVersionValue"` | control plane version. See Proxy section for proxy version |
-| networkValidator.connectAddr | string | `"1.1.1.1:20001"` | Address to which the network-validator will attempt to connect. we expect this to be rewritten |
+| networkValidator.connectAddr | string | `"1.1.1.1:20001"` | Address to which the network-validator will attempt to connect. This should be an IP that the cluster is expected to be able to reach but a port it should not, e.g., a public IP  for public clusters and a private IP for air-gapped clusters with a port like 20001. |
 | networkValidator.enableSecurityContext | bool | `true` | Include a securityContext in the network-validator pod spec |
 | networkValidator.listenAddr | string | `"0.0.0.0:4140"` | Address to which network-validator listens to requests from itself |
 | networkValidator.logFormat | string | plain | Log format (`plain` or `json`) for network-validator |
@@ -204,7 +209,7 @@ Kubernetes: `>=1.22.0-0`
 | policyController.image.version | string | linkerdVersion | Tag for the policy controller container image |
 | policyController.logLevel | string | `"info"` | Log level for the policy controller |
 | policyController.probeNetworks | list | `["0.0.0.0/0","::/0"]` | The networks from which probes are performed.  By default, all networks are allowed so that all probes are authorized. |
-| policyController.resources | object | destinationResources | policy controller resource requests & limits |
+| policyController.resources | object | `{"cpu":{"limit":"","request":""},"ephemeral-storage":{"limit":"","request":""},"memory":{"limit":"","request":""}}` | policy controller resource requests & limits |
 | policyController.resources.cpu.limit | string | `""` | Maximum amount of CPU units that the policy controller can use |
 | policyController.resources.cpu.request | string | `""` | Amount of CPU units that the policy controller requests |
 | policyController.resources.ephemeral-storage.limit | string | `""` | Maximum amount of ephemeral storage that the policy controller can use |
@@ -232,20 +237,27 @@ Kubernetes: `>=1.22.0-0`
 | proxy.control.streams.initialTimeout | string | `"3s"` | The timeout for the first update from the control plane. |
 | proxy.control.streams.lifetime | string | `"1h"` | The maximum duration for a response stream (i.e. before it will be reinitialized). |
 | proxy.cores | int | `0` | The `cpu.limit` and `cores` should be kept in sync. The value of `cores` must be an integer and should typically be set by rounding up from the limit. E.g. if cpu.limit is '1500m', cores should be 2. |
-| proxy.defaultInboundPolicy | string | "all-unauthenticated" | The default allow policy to use when no `Server` selects a pod.  One of: "all-authenticated", "all-unauthenticated", "cluster-authenticated", "cluster-unauthenticated", "deny" |
+| proxy.defaultInboundPolicy | string | "all-unauthenticated" | The default allow policy to use when no `Server` selects a pod.  One of: "all-authenticated", "all-unauthenticated", "cluster-authenticated", "cluster-unauthenticated", "deny", "audit" |
 | proxy.disableInboundProtocolDetectTimeout | bool | `false` | When set to true, disables the protocol detection timeout on the inbound side of the proxy by setting it to a very high value |
 | proxy.disableOutboundProtocolDetectTimeout | bool | `false` | When set to true, disables the protocol detection timeout on the outbound side of the proxy by setting it to a very high value |
 | proxy.enableExternalProfiles | bool | `false` | Enable service profiles for non-Kubernetes services |
+| proxy.enableShutdownEndpoint | bool | `false` | Enables the proxy's /shutdown admin endpoint |
+| proxy.gid | int | `-1` | Optional customisation of the group id under which the proxy runs (the group ID will be omitted if lower than 0) |
 | proxy.image.name | string | `"cr.l5d.io/linkerd/proxy"` | Docker image for the proxy |
 | proxy.image.pullPolicy | string | imagePullPolicy | Pull policy for the proxy container image |
 | proxy.image.version | string | linkerdVersion | Tag for the proxy container image |
+| proxy.inbound.server.http2.keepAliveInterval | string | `"10s"` | The interval at which PINGs are issued to remote HTTP/2 clients. |
+| proxy.inbound.server.http2.keepAliveTimeout | string | `"3s"` | The timeout within which keep-alive PINGs must be acknowledged on inbound HTTP/2 connections. |
 | proxy.inboundConnectTimeout | string | `"100ms"` | Maximum time allowed for the proxy to establish an inbound TCP connection |
 | proxy.inboundDiscoveryCacheUnusedTimeout | string | `"90s"` | Maximum time allowed before an unused inbound discovery result is evicted from the cache |
 | proxy.livenessProbe | object | `{"initialDelaySeconds":10,"timeoutSeconds":1}` | LivenessProbe timeout and delay configuration |
 | proxy.logFormat | string | `"plain"` | Log format (`plain` or `json`) for the proxy |
-| proxy.logLevel | string | `"warn,linkerd=info,trust_dns=error"` | Log level for the proxy |
+| proxy.logHTTPHeaders | `off` or `insecure` | `"off"` | If set to `off`, will prevent the proxy from logging HTTP headers. If set to `insecure`, HTTP headers may be logged verbatim. Note that setting this to `insecure` is not alone sufficient to log HTTP headers; the proxy logLevel must also be set to debug. |
+| proxy.logLevel | string | `"warn,linkerd=info,hickory=error"` | Log level for the proxy |
 | proxy.nativeSidecar | bool | `false` | Enable KEP-753 native sidecars This is an experimental feature. It requires Kubernetes >= 1.29. If enabled, .proxy.waitBeforeExitSeconds should not be used. |
 | proxy.opaquePorts | string | `"25,587,3306,4444,5432,6379,9300,11211"` | Default set of opaque ports - SMTP (25,587) server-first - MYSQL (3306) server-first - Galera (4444) server-first - PostgreSQL (5432) server-first - Redis (6379) server-first - ElasticSearch (9300) server-first - Memcached (11211) clients do not issue any preamble, which breaks detection |
+| proxy.outbound.server.http2.keepAliveInterval | string | `"10s"` | The interval at which PINGs are issued to local application HTTP/2 clients. |
+| proxy.outbound.server.http2.keepAliveTimeout | string | `"3s"` | The timeout within which keep-alive PINGs must be acknowledged on outbound HTTP/2 connections. |
 | proxy.outboundConnectTimeout | string | `"1000ms"` | Maximum time allowed for the proxy to establish an outbound TCP connection |
 | proxy.outboundDiscoveryCacheUnusedTimeout | string | `"5s"` | Maximum time allowed before an unused outbound discovery result is evicted from the cache |
 | proxy.ports.admin | int | `4191` | Admin port for the proxy container |
@@ -271,18 +283,13 @@ Kubernetes: `>=1.22.0-0`
 | proxyInit.ignoreOutboundPorts | string | `"4567,4568"` | Default set of outbound ports to skip via iptables - Galera (4567,4568) |
 | proxyInit.image.name | string | `"cr.l5d.io/linkerd/proxy-init"` | Docker image for the proxy-init container |
 | proxyInit.image.pullPolicy | string | imagePullPolicy | Pull policy for the proxy-init container image |
-| proxyInit.image.version | string | `"v2.2.4"` | Tag for the proxy-init container image |
+| proxyInit.image.version | string | `"v2.4.1"` | Tag for the proxy-init container image |
 | proxyInit.iptablesMode | string | `"legacy"` | Variant of iptables that will be used to configure routing. Currently, proxy-init can be run either in 'nft' or in 'legacy' mode. The mode will control which utility binary will be called. The host must support whichever mode will be used |
 | proxyInit.kubeAPIServerPorts | string | `"443,6443"` | Default set of ports to skip via iptables for control plane components so they can communicate with the Kubernetes API Server |
 | proxyInit.logFormat | string | plain | Log format (`plain` or `json`) for the proxy-init |
 | proxyInit.logLevel | string | info | Log level for the proxy-init |
 | proxyInit.privileged | bool | false | Privileged mode allows the container processes to inherit all security capabilities and bypass any security limitations enforced by the kubelet. When used with 'runAsRoot: true', the container will behave exactly as if it was running as root on the host. May escape cgroup limits and see other processes and devices on the host. |
-| proxyInit.resources.cpu.limit | string | `"100m"` | Maximum amount of CPU units that the proxy-init container can use |
-| proxyInit.resources.cpu.request | string | `"100m"` | Amount of CPU units that the proxy-init container requests |
-| proxyInit.resources.ephemeral-storage.limit | string | `""` | Maximum amount of ephemeral storage that the proxy-init container can use |
-| proxyInit.resources.ephemeral-storage.request | string | `""` | Amount of ephemeral storage that the proxy-init container requests |
-| proxyInit.resources.memory.limit | string | `"20Mi"` | Maximum amount of memory that the proxy-init container can use |
-| proxyInit.resources.memory.request | string | `"20Mi"` | Amount of memory that the proxy-init container requests |
+| proxyInit.runAsGroup | int | `65534` | This value is used only if runAsRoot is false; otherwise runAsGroup will be 0 |
 | proxyInit.runAsRoot | bool | `false` | Allow overriding the runAsNonRoot behaviour (<https://github.com/linkerd/linkerd2/issues/7308>) |
 | proxyInit.runAsUser | int | `65534` | This value is used only if runAsRoot is false; otherwise runAsUser will be 0 |
 | proxyInit.skipSubnets | string | `""` | Comma-separated list of subnets in valid CIDR format that should be skipped by the proxy |
@@ -297,6 +304,7 @@ Kubernetes: `>=1.22.0-0`
 | proxyInjector.namespaceSelector | object | `{"matchExpressions":[{"key":"config.linkerd.io/admission-webhooks","operator":"NotIn","values":["disabled"]},{"key":"kubernetes.io/metadata.name","operator":"NotIn","values":["kube-system","cert-manager"]}]}` | Namespace selector used by admission webhook. |
 | proxyInjector.objectSelector | object | `{"matchExpressions":[{"key":"linkerd.io/control-plane-component","operator":"DoesNotExist"},{"key":"linkerd.io/cni-resource","operator":"DoesNotExist"}]}` | Object selector used by admission webhook. |
 | proxyInjector.timeoutSeconds | int | `10` | Timeout in seconds before the API Server cancels a request to the proxy injector. If timeout is exceeded, the webhookfailurePolicy is used. |
+| revisionHistoryLimit | int | `10` | Specifies the number of old ReplicaSets to retain to allow rollback. |
 | runtimeClassName | string | `""` | Runtime Class Name for all the pods |
 | webhookFailurePolicy | string | `"Ignore"` | Failure policy for the proxy injector |
 

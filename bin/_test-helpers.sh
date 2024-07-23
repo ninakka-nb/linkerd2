@@ -12,9 +12,11 @@ testdir="$bindir"/../test/integration
 
 ##### Test setup helpers #####
 
-export default_test_names=(deep viz external helm-upgrade uninstall upgrade-edge upgrade-stable default-policy-deny rsa-ca)
+export default_test_names=(deep deep-native-sidecar viz external helm-upgrade uninstall upgrade-edge default-policy-deny rsa-ca)
 export external_resource_test_names=(external-resources)
-export all_test_names=(cluster-domain cni-calico-deep multicluster "${default_test_names[*]}" "${external_resource_test_names[*]}")
+# TODO(alpeb): add test cni-calico-deep-dual-stack
+export dual_stack_test_names=(deep-dual-stack)
+export all_test_names=(cluster-domain cni-calico-deep multicluster "${default_test_names[*]}" "${external_resource_test_names[*]}" "${dual_stack_test_names[*]}")
 images_load_default=(proxy controller policy-controller web metrics-api tap)
 
 tests_usage() {
@@ -23,7 +25,7 @@ tests_usage() {
 
 Optionally specify a test with the --name flag: [${all_test_names[*]}]
 
-Note: The cluster-domain, cni-calico-deep and multicluster tests require a custom cluster configuration (see bin/_test-helpers.sh)
+Note: The cluster-domain, deep-native-sidecar cni-calico-deep and multicluster tests require a custom cluster configuration (see bin/_test-helpers.sh)
 
 Usage:
     ${progname} [--images docker|archive|skip] [--name test-name] [--skip-cluster-create] /path/to/linkerd
@@ -372,7 +374,7 @@ run_test(){
 
   printf 'Test script: [%s] Params: [%s]\n' "${filename##*/}" "$*"
   # Exit on failure here
-  GO111MODULE=on go test -test.timeout=60m --failfast --mod=readonly "$filename" --linkerd="$linkerd_path" --helm-path="$helm_path" --default-inbound-policy="$default_inbound_policy" --k8s-context="$context" --integration-tests "$@" || exit 1
+  GO111MODULE=on go test -v -test.timeout=60m --failfast --mod=readonly "$filename" --linkerd="$linkerd_path" --helm-path="$helm_path" --default-inbound-policy="$default_inbound_policy" --k8s-context="$context" --integration-tests "$@" || exit 1
 }
 
 # Returns the latest version for the release channel
@@ -387,12 +389,6 @@ run_upgrade-edge_test() {
   run_test "$testdir/upgrade-edge/..."
 }
 
-# Run the upgrade-stable test by upgrading the most-recent stable release to the
-# HEAD of this branch.
-run_upgrade-stable_test() {
-  run_test "$testdir/upgrade-stable/..."
-}
-
 run_viz_test() {
   run_test "$testdir/viz/..."
 }
@@ -404,7 +400,7 @@ setup_helm() {
   export helm_release_name='helm-test'
   export helm_multicluster_release_name='multicluster-test'
   "$bindir"/helm-build
-  "$helm_path" --kube-context="$context" repo add linkerd https://helm.linkerd.io/stable
+  "$helm_path" --kube-context="$context" repo add linkerd https://helm.linkerd.io/edge
   exit_on_err 'error setting up Helm'
 }
 
@@ -423,18 +419,18 @@ helm_cleanup() {
 }
 
 run_helm-upgrade_test() {
-  local stable_version
-  stable_version=$(latest_release_channel 'stable')
+  local edge_version
+  edge_version=$(latest_release_channel 'edge')
 
-  if [ -z "$stable_version" ]; then
-    echo 'error getting stable_version'
+  if [ -z "$edge_version" ]; then
+    echo 'error getting edge_version'
     exit 1
   fi
 
   setup_helm
   helm_viz_chart="$( cd "$bindir"/.. && pwd )"/viz/charts/linkerd-viz
   run_test "$testdir/install/install_test.go" --helm-path="$helm_path" --helm-charts="$helm_charts" \
-  --viz-helm-chart="$helm_viz_chart" --viz-helm-stable-chart="linkerd/linkerd-viz" --helm-release="$helm_release_name" --upgrade-helm-from-version="$stable_version"
+  --viz-helm-chart="$helm_viz_chart" --viz-helm-stable-chart="linkerd/linkerd-viz" --helm-release="$helm_release_name" --upgrade-helm-from-version="$edge_version"
   helm_cleanup
 }
 
@@ -448,6 +444,14 @@ run_multicluster_test() {
 
 run_deep_test() {
   run_test "$testdir/deep/..."
+}
+
+run_deep-native-sidecar_test() {
+  run_test "$testdir/deep/..." --native-sidecar
+}
+
+run_deep-dual-stack_test() {
+  run_test "$testdir/deep/..." --dual-stack
 }
 
 run_default-policy-deny_test() {

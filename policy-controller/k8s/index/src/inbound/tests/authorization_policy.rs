@@ -1,6 +1,7 @@
 use super::*;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as metav1;
-use linkerd_policy_controller_core::{http_route, inbound};
+use linkerd_policy_controller_core::{inbound, routes};
+use linkerd_policy_controller_k8s_api::gateway as k8s_gateway_api;
 
 #[test]
 fn links_authorization_policy_with_mtls_name() {
@@ -33,7 +34,8 @@ fn links_authorization_policy_with_mtls_name() {
             reference: ServerRef::Server("srv-8080".to_string()),
             authorizations: Default::default(),
             protocol: ProxyProtocol::Http1,
-            http_routes: mk_default_routes(),
+            http_routes: mk_default_http_routes(),
+            grpc_routes: mk_default_grpc_routes(),
         },
     );
 
@@ -87,7 +89,8 @@ fn links_authorization_policy_with_mtls_name() {
             .into_iter()
             .collect(),
             protocol: ProxyProtocol::Http1,
-            http_routes: mk_default_routes(),
+            http_routes: mk_default_http_routes(),
+            grpc_routes: mk_default_grpc_routes(),
         },
     );
 }
@@ -123,7 +126,8 @@ fn authorization_targets_namespace() {
             reference: ServerRef::Server("srv-8080".to_string()),
             authorizations: Default::default(),
             protocol: ProxyProtocol::Http1,
-            http_routes: mk_default_routes(),
+            http_routes: mk_default_http_routes(),
+            grpc_routes: mk_default_grpc_routes(),
         },
     );
 
@@ -177,7 +181,8 @@ fn authorization_targets_namespace() {
             .into_iter()
             .collect(),
             protocol: ProxyProtocol::Http1,
-            http_routes: mk_default_routes(),
+            http_routes: mk_default_http_routes(),
+            grpc_routes: mk_default_grpc_routes(),
         },
     );
 }
@@ -213,7 +218,8 @@ fn links_authorization_policy_with_service_account() {
             reference: ServerRef::Server("srv-8080".to_string()),
             authorizations: Default::default(),
             protocol: ProxyProtocol::Http1,
-            http_routes: mk_default_routes(),
+            http_routes: mk_default_http_routes(),
+            grpc_routes: mk_default_grpc_routes(),
         },
     );
 
@@ -261,7 +267,8 @@ fn links_authorization_policy_with_service_account() {
             .into_iter()
             .collect(),
             protocol: ProxyProtocol::Http1,
-            http_routes: mk_default_routes(),
+            http_routes: mk_default_http_routes(),
+            grpc_routes: mk_default_grpc_routes(),
         },
     );
 }
@@ -329,12 +336,12 @@ fn authorization_policy_prevents_index_deletion() {
     test.index.write().apply(net_authn.clone());
 
     // Now we delete the server, and HTTPRoute.
-    <Index as kubert::index::IndexNamespacedResource<k8s::policy::Server>>::delete(
+    <Index as IndexNamespacedResource<k8s::policy::Server>>::delete(
         &mut test.index.write(),
         "ns-0".to_string(),
         "srv-8080".to_string(),
     );
-    <Index as kubert::index::IndexNamespacedResource<k8s::policy::HttpRoute>>::delete(
+    <Index as IndexNamespacedResource<k8s::policy::HttpRoute>>::delete(
         &mut test.index.write(),
         "ns-0".to_string(),
         "route-foo".to_string(),
@@ -362,14 +369,14 @@ fn authorization_policy_prevents_index_deletion() {
             reference: ServerRef::Server("srv-8080".to_string()),
             authorizations: Default::default(),
             protocol: ProxyProtocol::Http1,
-            http_routes: hashmap!(HttpRouteRef::Linkerd(http_route::GroupKindName{
+            http_routes: hashmap!(RouteRef::Resource(routes::GroupKindName{
                 group: "policy.linkerd.io".into(),
                 kind: "HTTPRoute".into(),
                 name: "route-foo".into(),
             }) => HttpRoute {
-                rules: vec![inbound::HttpRouteRule {
-                    matches: vec![http_route::HttpRouteMatch {
-                        path: Some(http_route::PathMatch::Prefix("/foo".to_string())),
+                rules: vec![inbound::InboundRouteRule {
+                    matches: vec![routes::HttpRouteMatch {
+                        path: Some(routes::PathMatch::Prefix("/foo".to_string())),
                         headers: vec![],
                         query_params: vec![],
                         method: None,
@@ -385,6 +392,7 @@ fn authorization_policy_prevents_index_deletion() {
             })
             .into_iter()
             .collect(),
+            grpc_routes: mk_default_grpc_routes(),
         },
     );
 }

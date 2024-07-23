@@ -42,8 +42,8 @@ type resourceTransformerInject struct {
 	closeWaitTimeout    time.Duration
 }
 
-func runInjectCmd(inputs []io.Reader, errWriter, outWriter io.Writer, transformer *resourceTransformerInject) int {
-	return transformInput(inputs, errWriter, outWriter, transformer)
+func runInjectCmd(inputs []io.Reader, errWriter, outWriter io.Writer, transformer *resourceTransformerInject, output string) int {
+	return transformInput(inputs, errWriter, outWriter, transformer, output)
 }
 
 func newCmdInject() *cobra.Command {
@@ -56,6 +56,7 @@ func newCmdInject() *cobra.Command {
 	injectFlags, injectFlagSet := makeInjectFlags(defaults)
 	var manualOption, enableDebugSidecar bool
 	var closeWaitTimeout time.Duration
+	var output string
 
 	cmd := &cobra.Command{
 		Use:   "inject [flags] CONFIG-FILE",
@@ -109,7 +110,7 @@ sub-folders, or coming from stdin.`,
 				enableDebugSidecar:  enableDebugSidecar,
 				closeWaitTimeout:    closeWaitTimeout,
 			}
-			exitCode := uninjectAndInject(in, stderr, stdout, transformer)
+			exitCode := uninjectAndInject(in, stderr, stdout, transformer, output)
 			os.Exit(exitCode)
 			return nil
 		},
@@ -132,18 +133,20 @@ sub-folders, or coming from stdin.`,
 		&closeWaitTimeout, "close-wait-timeout", closeWaitTimeout,
 		"Sets nf_conntrack_tcp_timeout_close_wait")
 
+	cmd.Flags().StringVarP(&output, "output", "o", "yaml", "Output format, one of: json|yaml")
+
 	cmd.Flags().AddFlagSet(proxyFlagSet)
 	cmd.Flags().AddFlagSet(injectFlagSet)
 
 	return cmd
 }
 
-func uninjectAndInject(inputs []io.Reader, errWriter, outWriter io.Writer, transformer *resourceTransformerInject) int {
+func uninjectAndInject(inputs []io.Reader, errWriter, outWriter io.Writer, transformer *resourceTransformerInject, output string) int {
 	var out bytes.Buffer
-	if exitCode := runUninjectSilentCmd(inputs, errWriter, &out, transformer.values); exitCode != 0 {
+	if exitCode := runUninjectSilentCmd(inputs, errWriter, &out, transformer.values, "yaml"); exitCode != 0 {
 		return exitCode
 	}
-	return runInjectCmd([]io.Reader{&out}, errWriter, outWriter, transformer)
+	return runInjectCmd([]io.Reader{&out}, errWriter, outWriter, transformer, output)
 }
 
 func (rt resourceTransformerInject) transform(bytes []byte) ([]byte, []inject.Report, error) {
@@ -433,6 +436,10 @@ func getOverrideAnnotations(values *linkerd2.Values, base *linkerd2.Values) map[
 
 	if proxy.UID != baseProxy.UID {
 		overrideAnnotations[k8s.ProxyUIDAnnotation] = strconv.FormatInt(proxy.UID, 10)
+	}
+
+	if proxy.GID >= 0 && (baseProxy.GID < 0 || proxy.GID != baseProxy.GID) {
+		overrideAnnotations[k8s.ProxyGIDAnnotation] = strconv.FormatInt(proxy.GID, 10)
 	}
 
 	if proxy.LogLevel != baseProxy.LogLevel {

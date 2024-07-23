@@ -1,7 +1,7 @@
 use anyhow::Result;
-use linkerd_policy_controller_core::http_route::GroupKindName;
+use linkerd_policy_controller_core::routes::GroupKindName;
 use linkerd_policy_controller_k8s_api::{
-    self as k8s,
+    self as k8s, gateway as k8s_gateway_api,
     policy::{LocalTargetRef, NamespacedTargetRef},
     ServiceAccount,
 };
@@ -15,6 +15,7 @@ pub(crate) struct Spec {
 #[derive(Debug, PartialEq)]
 pub(crate) enum Target {
     HttpRoute(GroupKindName),
+    GrpcRoute(GroupKindName),
     Server(String),
     Namespace,
 }
@@ -68,6 +69,13 @@ fn target(t: LocalTargetRef) -> Result<Target> {
             || t.targets_kind::<k8s_gateway_api::HttpRoute>() =>
         {
             Ok(Target::HttpRoute(GroupKindName {
+                group: t.group.unwrap_or_default().into(),
+                kind: t.kind.into(),
+                name: t.name.into(),
+            }))
+        }
+        t if t.targets_kind::<k8s_gateway_api::GrpcRoute>() => {
+            Ok(Target::GrpcRoute(GroupKindName {
                 group: t.group.unwrap_or_default().into(),
                 kind: t.kind.into(),
                 name: t.name.into(),

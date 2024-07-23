@@ -29,6 +29,7 @@ type (
 		ControllerImage              string                 `json:"controllerImage"`
 		ControllerReplicas           uint                   `json:"controllerReplicas"`
 		ControllerUID                int64                  `json:"controllerUID"`
+		ControllerGID                int64                  `json:"controllerGID"`
 		EnableH2Upgrade              bool                   `json:"enableH2Upgrade"`
 		EnablePodAntiAffinity        bool                   `json:"enablePodAntiAffinity"`
 		NodeAffinity                 map[string]interface{} `json:"nodeAffinity"`
@@ -49,6 +50,7 @@ type (
 		HighAvailability             bool                   `json:"highAvailability"`
 		CNIEnabled                   bool                   `json:"cniEnabled"`
 		EnableEndpointSlices         bool                   `json:"enableEndpointSlices"`
+		DisableIPv6                  bool                   `json:"disableIPv6"`
 		ControlPlaneTracing          bool                   `json:"controlPlaneTracing"`
 		ControlPlaneTracingNamespace string                 `json:"controlPlaneTracingNamespace"`
 		IdentityTrustAnchorsPEM      string                 `json:"identityTrustAnchorsPEM"`
@@ -56,6 +58,11 @@ type (
 		PrometheusURL                string                 `json:"prometheusUrl"`
 		ImagePullSecrets             []map[string]string    `json:"imagePullSecrets"`
 		LinkerdVersion               string                 `json:"linkerdVersion"`
+		RevisionHistoryLimit         uint                   `json:"revisionHistoryLimit"`
+
+		DestinationController map[string]interface{} `json:"destinationController"`
+		Heartbeat             map[string]interface{} `json:"heartbeat"`
+		SPValidator           map[string]interface{} `json:"spValidator"`
 
 		PodAnnotations    map[string]string `json:"podAnnotations"`
 		PodLabels         map[string]string `json:"podLabels"`
@@ -68,7 +75,7 @@ type (
 		NetworkValidator *NetworkValidator `json:"networkValidator"`
 		Identity         *Identity         `json:"identity"`
 		DebugContainer   *DebugContainer   `json:"debugContainer"`
-		ProxyInjector    *Webhook          `json:"proxyInjector"`
+		ProxyInjector    *ProxyInjector    `json:"proxyInjector"`
 		ProfileValidator *Webhook          `json:"profileValidator"`
 		PolicyValidator  *Webhook          `json:"policyValidator"`
 		NodeSelector     map[string]string `json:"nodeSelector"`
@@ -108,12 +115,15 @@ type (
 		Cores                                int64            `json:"cores,omitempty"`
 		EnableExternalProfiles               bool             `json:"enableExternalProfiles"`
 		Image                                *Image           `json:"image"`
+		EnableShutdownEndpoint               bool             `json:"enableShutdownEndpoint"`
 		LogLevel                             string           `json:"logLevel"`
 		LogFormat                            string           `json:"logFormat"`
+		LogHTTPHeaders                       string           `json:"logHTTPHeaders"`
 		SAMountPath                          *VolumeMountPath `json:"saMountPath"`
 		Ports                                *Ports           `json:"ports"`
 		Resources                            *Resources       `json:"resources"`
 		UID                                  int64            `json:"uid"`
+		GID                                  int64            `json:"gid"`
 		WaitBeforeExitSeconds                uint64           `json:"waitBeforeExitSeconds"`
 		IsGateway                            bool             `json:"isGateway"`
 		IsIngress                            bool             `json:"isIngress"`
@@ -138,7 +148,14 @@ type (
 
 		AdditionalEnv   []corev1.EnvVar `json:"additionalEnv"`
 		ExperimentalEnv []corev1.EnvVar `json:"experimentalEnv"`
+
+		Inbound  ProxyParams `json:"inbound,omitempty"`
+		Outbound ProxyParams `json:"outbound,omitempty"`
 	}
+
+	ProxyParams      = map[string]ProxyScopeParams
+	ProxyScopeParams = map[string]ProxyProtoParams
+	ProxyProtoParams = map[string]interface{}
 
 	ProxyControl struct {
 		Streams *ProxyControlStreams `json:"streams"`
@@ -152,22 +169,24 @@ type (
 
 	// ProxyInit contains the fields to set the proxy-init container
 	ProxyInit struct {
-		Capabilities         *Capabilities    `json:"capabilities"`
-		IgnoreInboundPorts   string           `json:"ignoreInboundPorts"`
-		IgnoreOutboundPorts  string           `json:"ignoreOutboundPorts"`
-		KubeAPIServerPorts   string           `json:"kubeAPIServerPorts"`
-		SkipSubnets          string           `json:"skipSubnets"`
-		LogLevel             string           `json:"logLevel"`
-		LogFormat            string           `json:"logFormat"`
-		Image                *Image           `json:"image"`
-		SAMountPath          *VolumeMountPath `json:"saMountPath"`
-		XTMountPath          *VolumeMountPath `json:"xtMountPath"`
-		Resources            *Resources       `json:"resources"`
-		CloseWaitTimeoutSecs int64            `json:"closeWaitTimeoutSecs"`
-		Privileged           bool             `json:"privileged"`
-		RunAsRoot            bool             `json:"runAsRoot"`
-		RunAsUser            int64            `json:"runAsUser"`
-		IptablesMode         string           `json:"iptablesMode"`
+		Capabilities        *Capabilities    `json:"capabilities"`
+		IgnoreInboundPorts  string           `json:"ignoreInboundPorts"`
+		IgnoreOutboundPorts string           `json:"ignoreOutboundPorts"`
+		KubeAPIServerPorts  string           `json:"kubeAPIServerPorts"`
+		SkipSubnets         string           `json:"skipSubnets"`
+		LogLevel            string           `json:"logLevel"`
+		LogFormat           string           `json:"logFormat"`
+		Image               *Image           `json:"image"`
+		SAMountPath         *VolumeMountPath `json:"saMountPath"`
+		XTMountPath         *VolumeMountPath `json:"xtMountPath"`
+		/* DEPRECATED: should be removed after stable-2.16.0, left in for bc */
+		Resources            *Resources `json:"resources"`
+		CloseWaitTimeoutSecs int64      `json:"closeWaitTimeoutSecs"`
+		Privileged           bool       `json:"privileged"`
+		RunAsRoot            bool       `json:"runAsRoot"`
+		RunAsUser            int64      `json:"runAsUser"`
+		RunAsGroup           int64      `json:"runAsGroup"`
+		IptablesMode         string     `json:"iptablesMode"`
 	}
 
 	NetworkValidator struct {
@@ -274,6 +293,9 @@ type (
 		ServiceAccountTokenProjection bool     `json:"serviceAccountTokenProjection"`
 		Issuer                        *Issuer  `json:"issuer"`
 		KubeAPI                       *KubeAPI `json:"kubeAPI"`
+
+		AdditionalEnv   []corev1.EnvVar `json:"additionalEnv"`
+		ExperimentalEnv []corev1.EnvVar `json:"experimentalEnv"`
 	}
 
 	// Issuer has the Helm variables of the identity issuer
@@ -288,6 +310,13 @@ type (
 	KubeAPI struct {
 		ClientQPS   float32 `json:"clientQPS"`
 		ClientBurst int     `json:"clientBurst"`
+	}
+
+	// ProxyInjector configures the proxy-injector webhook
+	ProxyInjector struct {
+		Webhook
+		AdditionalEnv   []corev1.EnvVar `json:"additionalEnv"`
+		ExperimentalEnv []corev1.EnvVar `json:"experimentalEnv"`
 	}
 
 	// Webhook Helm variables for a webhook

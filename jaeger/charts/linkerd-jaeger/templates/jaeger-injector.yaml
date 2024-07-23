@@ -17,6 +17,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: {{ .Values.webhook.replicas }}
+  revisionHistoryLimit: {{.Values.revisionHistoryLimit}}
   selector:
     matchLabels:
       linkerd.io/extension: jaeger
@@ -82,6 +83,7 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: {{.Values.webhook.UID | default .Values.defaultUID}}
+          runAsGroup: {{.Values.webhook.GID | default .Values.defaultGID}}
           seccompProfile:
             type: RuntimeDefault
         volumeMounts:

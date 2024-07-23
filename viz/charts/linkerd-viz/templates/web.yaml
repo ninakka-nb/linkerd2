@@ -49,6 +49,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: {{.Values.dashboard.replicas}}
+  revisionHistoryLimit: {{.Values.revisionHistoryLimit}}
   selector:
     matchLabels:
       linkerd.io/extension: viz
@@ -137,6 +138,7 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: {{.Values.dashboard.UID | default .Values.defaultUID}}
+          runAsGroup: {{.Values.dashboard.GID | default .Values.defaultGID}}
           seccompProfile:
             type: RuntimeDefault
       securityContext:

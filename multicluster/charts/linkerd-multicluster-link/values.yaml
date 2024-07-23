@@ -39,6 +39,8 @@ resources: {}
 serviceMirrorRetryLimit: 3
 # -- User id under which the Service Mirror shall be ran
 serviceMirrorUID: 2103
+# -- Group id under which the Service Mirror shall be ran
+serviceMirrorGID: 2103
 # -- Name of the target cluster that's going to be linked
 targetClusterName: ""
 # -- Tolerations for the Service mirror pod
@@ -49,3 +51,6 @@ tolerations: {}
 # set to true on the extension and control plane install. Note PSP has been
 # deprecated since k8s v1.21
 enablePSP: false
+
+# -- Specifies the number of old ReplicaSets to retain to allow rollback.
+revisionHistoryLimit: 10

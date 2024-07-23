@@ -1,3 +1,6 @@
 pub mod index;
 
-pub use index::{Index, ServiceRef, SharedIndex};
+pub use index::{metrics, Index, ServiceRef, SharedIndex};
+
+#[cfg(test)]
+mod tests;

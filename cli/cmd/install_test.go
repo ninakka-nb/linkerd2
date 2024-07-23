@@ -22,18 +22,27 @@ const (
 )
 
 func TestRender(t *testing.T) {
-	defaultValues, err := testInstallOptions()
+	defaultValues, err := testInstallOptionsFakeCerts()
 	if err != nil {
 		t.Fatal(err)
 	}
-	addFakeTLSSecrets(defaultValues)
+
+	gidValues, err := testInstallOptionsFakeCerts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	gidValues.ControllerGID = 1234
+	gidValues.Proxy.GID = 4321
 
 	// A configuration that shows that all config setting strings are honored
 	// by `render()`.
+	var controllerGID int64 = 2103
+	var proxyGID int64 = 2102
 	metaValues := &charts.Values{
 		ControllerImage:         "ControllerImage",
 		LinkerdVersion:          "LinkerdVersion",
 		ControllerUID:           2103,
+		ControllerGID:           controllerGID,
 		EnableH2Upgrade:         true,
 		WebhookFailurePolicy:    "WebhookFailurePolicy",
 		HeartbeatSchedule:       "1 2 3 4 5",
@@ -47,6 +56,7 @@ func TestRender(t *testing.T) {
 		ControllerLogLevel:      "ControllerLogLevel",
 		ControllerLogFormat:     "ControllerLogFormat",
 		ProxyContainerName:      "ProxyContainerName",
+		RevisionHistoryLimit:    10,
 		CNIEnabled:              false,
 		IdentityTrustDomain:     defaultValues.IdentityTrustDomain,
 		IdentityTrustAnchorsPEM: defaultValues.IdentityTrustAnchorsPEM,
@@ -78,8 +88,9 @@ func TestRender(t *testing.T) {
 				PullPolicy: "ImagePullPolicy",
 				Version:    "ProxyVersion",
 			},
-			LogLevel:  "warn,linkerd=info",
-			LogFormat: "plain",
+			LogLevel:       "warn,linkerd=info",
+			LogFormat:      "plain",
+			LogHTTPHeaders: "off",
 			Resources: &charts.Resources{
 				CPU: charts.Constraints{
 					Limit:   "cpu-limit",
@@ -97,6 +108,7 @@ func TestRender(t *testing.T) {
 				Outbound: 4140,
 			},
 			UID:                  2102,
+			GID:                  proxyGID,
 			OpaquePorts:          "25,443,587,3306,5432,11211",
 			Await:                true,
 			DefaultInboundPolicy: "default-allow-policy",
@@ -117,22 +129,13 @@ func TestRender(t *testing.T) {
 				Version:    "ProxyInitVersion",
 			},
 			IgnoreOutboundPorts: "443",
-			Resources: &charts.Resources{
-				CPU: charts.Constraints{
-					Limit:   "100m",
-					Request: "10m",
-				},
-				Memory: charts.Constraints{
-					Limit:   "50Mi",
-					Request: "10Mi",
-				},
-			},
 			XTMountPath: &charts.VolumeMountPath{
 				MountPath: "/run",
 				Name:      "linkerd-proxy-init-xtables-lock",
 			},
-			RunAsRoot: false,
-			RunAsUser: 65534,
+			RunAsRoot:  false,
+			RunAsUser:  65534,
+			RunAsGroup: 65534,
 		},
 		NetworkValidator: &charts.NetworkValidator{
 			LogLevel:    "debug",
@@ -248,6 +251,7 @@ func TestRender(t *testing.T) {
 		{defaultValues, "install_custom_domain.golden", values.Options{}},
 		{defaultValues, "install_values_file.golden", values.Options{ValueFiles: []string{filepath.Join("testdata", "install_config.yaml")}}},
 		{defaultValues, "install_default_token.golden", values.Options{Values: []string{"identity.serviceAccountTokenProjection=false"}}},
+		{gidValues, "install_gid_output.golden", values.Options{}},
 	}
 
 	for i, tc := range testCases {
@@ -258,9 +262,10 @@ func TestRender(t *testing.T) {
 				t.Fatalf("Failed to get values overrides: %v", err)
 			}
 			var buf bytes.Buffer
-			if err := renderControlPlane(&buf, tc.values, valuesOverrides); err != nil {
+			if err := renderControlPlane(&buf, tc.values, valuesOverrides, "yaml"); err != nil {
 				t.Fatalf("Failed to render templates: %v", err)
 			}
+
 			if err := testDataDiffer.DiffTestYAML(tc.goldenFileName, buf.String()); err != nil {
 				t.Error(err)
 			}
@@ -276,7 +281,7 @@ func TestIgnoreCluster(t *testing.T) {
 	addFakeTLSSecrets(defaultValues)
 
 	var buf bytes.Buffer
-	if err := installControlPlane(context.Background(), nil, &buf, defaultValues, nil, values.Options{}); err != nil {
+	if err := installControlPlane(context.Background(), nil, &buf, defaultValues, nil, values.Options{}, "yaml"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -289,7 +294,7 @@ func TestRenderCRDs(t *testing.T) {
 	addFakeTLSSecrets(defaultValues)
 
 	var buf bytes.Buffer
-	if err := renderCRDs(&buf, values.Options{}); err != nil {
+	if err := renderCRDs(&buf, values.Options{}, "yaml"); err != nil {
 		t.Fatalf("Failed to render templates: %v", err)
 	}
 	if err := testDataDiffer.DiffTestYAML("install_crds.golden", buf.String()); err != nil {
@@ -321,6 +326,15 @@ func TestValidateAndBuild_Errors(t *testing.T) {
 			t.Fatal("expected error but got nothing")
 		}
 	})
+}
+
+func testInstallOptionsFakeCerts() (*charts.Values, error) {
+	values, err := testInstallOptions()
+	if err != nil {
+		return nil, err
+	}
+	addFakeTLSSecrets(values)
+	return values, nil
 }
 
 func testInstallOptions() (*charts.Values, error) {
@@ -599,7 +613,7 @@ func TestValidate(t *testing.T) {
 			t.Fatalf("Unexpected error: %v\n", err)
 		}
 		values.Proxy.DefaultInboundPolicy = "everybody"
-		expected := "--default-inbound-policy must be one of: all-authenticated, all-unauthenticated, cluster-authenticated, cluster-unauthenticated, deny (got everybody)"
+		expected := "--default-inbound-policy must be one of: all-authenticated, all-unauthenticated, cluster-authenticated, cluster-unauthenticated, deny, audit (got everybody)"
 
 		err = validateValues(context.Background(), nil, values)
 		if err == nil {

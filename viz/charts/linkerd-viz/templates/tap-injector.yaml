@@ -43,6 +43,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: {{.Values.tapInjector.replicas}}
+  revisionHistoryLimit: {{.Values.revisionHistoryLimit}}
   selector:
     matchLabels:
       component: tap-injector
@@ -113,6 +114,7 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: {{.Values.tapInjector.UID | default .Values.defaultUID}}
+          runAsGroup: {{.Values.tapInjector.GID | default .Values.defaultGID}}
           seccompProfile:
             type: RuntimeDefault
         volumeMounts:
