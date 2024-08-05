@@ -584,9 +584,9 @@ data:
     imagePullSecrets: []
     linkerdVersion: install-control-plane-version
     networkValidator:
-      connectAddr: 1.1.1.1:20001
+      connectAddr: ""
       enableSecurityContext: true
-      listenAddr: 0.0.0.0:4140
+      listenAddr: ""
       logFormat: plain
       logLevel: debug
       timeout: 10s
@@ -875,6 +875,7 @@ spec:
     port: 8080
     targetPort: 8080
 ---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -984,7 +985,7 @@ spec:
         - name: LINKERD2_PROXY_SHUTDOWN_ENDPOINT_ENABLED
           value: "false"
         - name: LINKERD2_PROXY_LOG
-          value: "warn,linkerd=info,hickory=error,linkerd_proxy_http::client[{headers}]=off"
+          value: "warn,linkerd=info,hickory=error,[{headers}]=off,[{request}]=off"
         - name: LINKERD2_PROXY_LOG_FORMAT
           value: "plain"
         - name: LINKERD2_PROXY_DESTINATION_SVC_ADDR
@@ -1015,15 +1016,15 @@ spec:
         - name: LINKERD2_PROXY_INBOUND_DISCOVERY_IDLE_TIMEOUT
           value: "90s"
         - name: LINKERD2_PROXY_CONTROL_LISTEN_ADDR
-          value: "[::]:4190"
+          value: "0.0.0.0:4190"
         - name: LINKERD2_PROXY_ADMIN_LISTEN_ADDR
-          value: "[::]:4191"
+          value: "0.0.0.0:4191"
         - name: LINKERD2_PROXY_OUTBOUND_LISTEN_ADDR
           value: "127.0.0.1:4140"
         - name: LINKERD2_PROXY_OUTBOUND_LISTEN_ADDRS
           value: "127.0.0.1:4140"
         - name: LINKERD2_PROXY_INBOUND_LISTEN_ADDR
-          value: "[::]:4143"
+          value: "0.0.0.0:4143"
         - name: LINKERD2_PROXY_INBOUND_IPS
           valueFrom:
             fieldRef:
@@ -1321,7 +1322,7 @@ spec:
         - name: LINKERD2_PROXY_SHUTDOWN_ENDPOINT_ENABLED
           value: "false"
         - name: LINKERD2_PROXY_LOG
-          value: "warn,linkerd=info,hickory=error,linkerd_proxy_http::client[{headers}]=off"
+          value: "warn,linkerd=info,hickory=error,[{headers}]=off,[{request}]=off"
         - name: LINKERD2_PROXY_LOG_FORMAT
           value: "plain"
         - name: LINKERD2_PROXY_DESTINATION_SVC_ADDR
@@ -1352,15 +1353,15 @@ spec:
         - name: LINKERD2_PROXY_INBOUND_DISCOVERY_IDLE_TIMEOUT
           value: "90s"
         - name: LINKERD2_PROXY_CONTROL_LISTEN_ADDR
-          value: "[::]:4190"
+          value: "0.0.0.0:4190"
         - name: LINKERD2_PROXY_ADMIN_LISTEN_ADDR
-          value: "[::]:4191"
+          value: "0.0.0.0:4191"
         - name: LINKERD2_PROXY_OUTBOUND_LISTEN_ADDR
           value: "127.0.0.1:4140"
         - name: LINKERD2_PROXY_OUTBOUND_LISTEN_ADDRS
           value: "127.0.0.1:4140"
         - name: LINKERD2_PROXY_INBOUND_LISTEN_ADDR
-          value: "[::]:4143"
+          value: "0.0.0.0:4143"
         - name: LINKERD2_PROXY_INBOUND_IPS
           valueFrom:
             fieldRef:
@@ -1535,10 +1536,10 @@ spec:
           name: sp-tls
           readOnly: true
       - args:
-        - --admin-addr=[::]:9990
+        - --admin-addr=0.0.0.0:9990
         - --control-plane-namespace=linkerd
-        - --grpc-addr=[::]:8090
-        - --server-addr=[::]:9443
+        - --grpc-addr=0.0.0.0:8090
+        - --server-addr=0.0.0.0:9443
         - --server-tls-key=/var/run/linkerd/tls/tls.key
         - --server-tls-certs=/var/run/linkerd/tls/tls.crt
         - --cluster-networks=10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16,fd00::/8
@@ -1759,7 +1760,7 @@ spec:
         - name: LINKERD2_PROXY_SHUTDOWN_ENDPOINT_ENABLED
           value: "false"
         - name: LINKERD2_PROXY_LOG
-          value: "warn,linkerd=info,hickory=error,linkerd_proxy_http::client[{headers}]=off"
+          value: "warn,linkerd=info,hickory=error,[{headers}]=off,[{request}]=off"
         - name: LINKERD2_PROXY_LOG_FORMAT
           value: "plain"
         - name: LINKERD2_PROXY_DESTINATION_SVC_ADDR
@@ -1790,15 +1791,15 @@ spec:
         - name: LINKERD2_PROXY_INBOUND_DISCOVERY_IDLE_TIMEOUT
           value: "90s"
         - name: LINKERD2_PROXY_CONTROL_LISTEN_ADDR
-          value: "[::]:4190"
+          value: "0.0.0.0:4190"
         - name: LINKERD2_PROXY_ADMIN_LISTEN_ADDR
-          value: "[::]:4191"
+          value: "0.0.0.0:4191"
         - name: LINKERD2_PROXY_OUTBOUND_LISTEN_ADDR
           value: "127.0.0.1:4140"
         - name: LINKERD2_PROXY_OUTBOUND_LISTEN_ADDRS
           value: "127.0.0.1:4140"
         - name: LINKERD2_PROXY_INBOUND_LISTEN_ADDR
-          value: "[::]:4143"
+          value: "0.0.0.0:4143"
         - name: LINKERD2_PROXY_INBOUND_IPS
           valueFrom:
             fieldRef:
